@@ -23,6 +23,7 @@ public class ArthasConstant {
     public static final String CPU_INDEX_NAME = "dayu_arthas-profile-task-cpu_";
     public static final String FLAME_DIAGRAM_INDEX_NAME = "dayu_arthas-profile-task-flame-diagram_";
     public static final String MEM_INDEX_NAME = "dayu_arthas-profile-task-mem_";
+    public static final String THREAD_INDEX_NAME = "dayu_arthas-profile-task-thread_";
     public static final String SYSTEM_INDEX_NAME = "dayu_arthas-profile-task-system_";
     public static final String CLASS_INDEX_NAME = "dayu_arthas-profile-task-class_";
     public static final String DATA_SAMPLING_TIME = "dataSamplingTime";

@@ -18,25 +18,25 @@
 
 package org.apache.skywalking.oap.server.storage.plugin.elasticsearch.base;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.skywalking.apm.network.arthas.v3.ArthasSamplingData;
-import org.apache.skywalking.apm.network.arthas.v3.ClassData;
-import org.apache.skywalking.apm.network.arthas.v3.SystemData;
+import org.apache.skywalking.apm.network.arthas.v3.*;
 import org.apache.skywalking.apm.network.dayu.v3.Machine;
 import org.apache.skywalking.apm.network.dayu.v3.MachineMetric;
+import org.apache.skywalking.library.elasticsearch.requests.search.*;
+import org.apache.skywalking.library.elasticsearch.response.search.SearchHit;
+import org.apache.skywalking.library.elasticsearch.response.search.SearchResponse;
 import org.apache.skywalking.oap.server.core.analysis.manual.arthas.FlameDiagramSamplingStatus;
 import org.apache.skywalking.oap.server.core.storage.model.arthas.CpuStack;
 import org.apache.skywalking.oap.server.core.analysis.manual.arthas.ArthasConstant;
 import org.apache.skywalking.oap.server.core.analysis.manual.machine.MachineConstant;
 import org.apache.skywalking.oap.server.core.storage.IDayuDAO;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSearchClient;
+import org.apache.skywalking.oap.server.library.util.CollectionUtils;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -89,8 +89,10 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
                 break;
             case SYSTEM:
                 saveSystemData(arthasSamplingData);
+                break;
             case CLASS:
                 saveClassData(arthasSamplingData);
+                break;
         }
     }
 
@@ -130,14 +132,18 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
         }
     }
 
+    private void checkIndexName(String indexName) {
+        boolean exists = getClient().isExistsIndex(indexName);
+        if (!exists) {
+            getClient().createIndex(indexName);
+        }
+    }
+
     private void saveCpuData(ArthasSamplingData arthasSamplingData) {
         try {
             int profileTaskId = arthasSamplingData.getProfileTaskId();
             String indexName = ArthasConstant.CPU_INDEX_NAME + profileTaskId;
-            boolean exists = getClient().isExistsIndex(indexName);
-            if (!exists) {
-                getClient().createIndex(indexName);
-            }
+            checkIndexName(indexName);
 
             Map<String, Object> map = Maps.newHashMap();
             map.put("dataSamplingTime", arthasSamplingData.getDataSamplingTime());
@@ -150,6 +156,7 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
                     .collect(Collectors.toList());
             map.put("stackList", cpuStackList);
             getClient().forceInsert(indexName, UUID.randomUUID().toString(), map);
+            saveThreadData(profileTaskId, arthasSamplingData.getDataSamplingTime(), cpuStackList);
         } catch (Exception e) {
             log.error("save arthas profile task cpu data fail, {}", e.getMessage());
             e.printStackTrace();
@@ -160,10 +167,7 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
         try {
             int profileTaskId = arthasSamplingData.getProfileTaskId();
             String indexName = ArthasConstant.MEM_INDEX_NAME + profileTaskId;
-            boolean exists = getClient().isExistsIndex(indexName);
-            if (!exists) {
-                getClient().createIndex(indexName);
-            }
+            checkIndexName(indexName);
 
             Map<String, Object> map = Maps.newHashMap();
             map.put("dataSamplingTime", arthasSamplingData.getDataSamplingTime());
@@ -182,10 +186,7 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
         try {
             int profileTaskId = arthasSamplingData.getProfileTaskId();
             String indexName = ArthasConstant.SYSTEM_INDEX_NAME + profileTaskId;
-            boolean exists = getClient().isExistsIndex(indexName);
-            if (!exists) {
-                getClient().createIndex(indexName);
-            }
+            checkIndexName(indexName);
 
             Map<String, Object> map = Maps.newHashMap();
             SystemData systemData = arthasSamplingData.getSystemData();
@@ -204,10 +205,7 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
         try {
             int profileTaskId = arthasSamplingData.getProfileTaskId();
             String indexName = ArthasConstant.CLASS_INDEX_NAME + profileTaskId;
-            boolean exists = getClient().isExistsIndex(indexName);
-            if (!exists) {
-                getClient().createIndex(indexName);
-            }
+            checkIndexName(indexName);
 
             ClassData classData = arthasSamplingData.getClassData();
             List<String> classNameList = classData.getClassNameList();
@@ -221,4 +219,84 @@ public class DayuEsDAO extends EsDAO implements IDayuDAO {
             e.printStackTrace();
         }
     }
+
+    private void saveThreadData(Integer profileTaskId, String dataSamplingTime, List<CpuStack> cpuStackList) {
+        String indexName = ArthasConstant.THREAD_INDEX_NAME + profileTaskId;
+        checkIndexName(indexName);
+
+        Map<String, Object> map = Maps.newHashMap();
+        map.put("dataSamplingTime", dataSamplingTime);
+
+        List<CpuStack> lastThreadList = getLastThreadData(profileTaskId);
+        int threadAddCount = 0;
+        int threadDecCount = 0;
+        List<CpuStack> threadAddList = Lists.newArrayList();
+        List<CpuStack> threadDecList = Lists.newArrayList();
+
+        if (CollectionUtils.isNotEmpty(lastThreadList)) {
+            threadAddList = cpuStackList.stream()
+                    .filter(x -> !lastThreadList.stream().map(CpuStack::getName).collect(Collectors.toList()).contains(x.getName()))
+                    .collect(Collectors.toList());
+            threadDecList = lastThreadList.stream()
+                    .filter(x -> !cpuStackList.stream().map(CpuStack::getName).collect(Collectors.toList()).contains(x.getName()))
+                    .collect(Collectors.toList());
+            threadAddCount = threadAddList.size();
+            threadDecCount = threadDecList.size();
+        }
+
+        int threadTotal = cpuStackList.size();
+        map.put("threadTotal", threadTotal);
+        map.put("threadAddCount", threadAddCount);
+        map.put("threadDecCount", threadDecCount);
+        map.put("threadAddList", threadAddList);
+        map.put("threadDecList", threadDecList);
+
+        getClient().forceInsert(indexName, UUID.randomUUID().toString(), map);
+    }
+
+    private List<CpuStack> getLastThreadData(Integer profileTaskId) {
+        String cpuIndexName = ArthasConstant.CPU_INDEX_NAME + profileTaskId;
+        SearchBuilder builder = Search.builder();
+        BoolQueryBuilder boolQueryBuilder = Query.bool();
+        boolQueryBuilder.must(Query.term(ArthasConstant.SAMPLING_ENUM_KEYWORD, SamplingEnum.CPU));
+
+        builder.query(boolQueryBuilder);
+        builder.source(ArthasConstant.STACK_LIST);
+        builder.sort(ArthasConstant.DATA_SAMPLING_TIME_KEYWORD, Sort.Order.DESC);
+        builder.size(1);
+
+        List<CpuStack> result = Lists.newArrayList();
+
+        boolean hasIndex = getClient().isExistsIndex(cpuIndexName);
+        if (!hasIndex) {
+            return result;
+        }
+
+        SearchResponse response = getClient().search(cpuIndexName, builder.build());
+        for (SearchHit hit : response.getHits().getHits()) {
+            List<Map<String, Object>> stackListData = (List<Map<String, Object>>) hit.getSource().get(ArthasConstant.STACK_LIST);
+            stackListData.forEach(x -> {
+                CpuStack.CpuStackBuilder cpuStackBuilder = CpuStack.builder();
+                cpuStackBuilder.id((Integer) x.get("id")).cpu((Double) x.get("cpu"))
+                        .state((String) x.get("state")).name((String) x.get("name"))
+                        .priority((Integer) x.get("priority")).group((String) x.get("group"));
+                result.add(cpuStackBuilder.build());
+            });
+        }
+        return result;
+    }
+
+//    public static void main(String[] args) {
+//        ElasticSearchClient elasticSearchClient = new ElasticSearchClient(
+//                "172.21.0.246:9200", "http", "", "",
+//                "", "",
+//                indexNameConverter(""), 3000,
+//                30000, 15000, 0);
+//        elasticSearchClient.connect();
+//
+//        DayuEsDAO dayuEsDAO = new DayuEsDAO(elasticSearchClient);
+//        List<CpuStack> lastThreadData = dayuEsDAO.getLastThreadData(2034070);
+//        dayuEsDAO.saveThreadData(2034322, "2024-04-08 13:59:23", lastThreadData );
+//    }
+
 }

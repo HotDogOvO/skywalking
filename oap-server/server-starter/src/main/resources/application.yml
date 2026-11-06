@@ -141,7 +141,7 @@ storage:
   selector: ${SW_STORAGE:elasticsearch}
   elasticsearch:
     namespace: ${SW_NAMESPACE:""}
-    clusterNodes: ${SW_STORAGE_ES_CLUSTER_NODES:172.21.0.246:9200}
+    clusterNodes: ${SW_STORAGE_ES_CLUSTER_NODES:172.21.0.56:19200}
     protocol: ${SW_STORAGE_ES_HTTP_PROTOCOL:"http"}
     connectTimeout: ${SW_STORAGE_ES_CONNECT_TIMEOUT:3000}
     socketTimeout: ${SW_STORAGE_ES_SOCKET_TIMEOUT:30000}
@@ -486,7 +486,7 @@ configuration:
     password: ${SW_CONFIG_ETCD_password:}
   consul:
     # Consul host and ports, separated by comma, e.g. 1.2.3.4:8500,2.3.4.5:8500
-    hostAndPorts: ${SW_CONFIG_CONSUL_HOST_AND_PORTS:172.21.0.246:8500}
+    hostAndPorts: ${SW_CONFIG_CONSUL_HOST_AND_PORTS:172.21.0.56:8500}
     # Sync period in seconds. Defaults to 60 seconds.
     period: ${SW_CONFIG_CONSUL_PERIOD:60}
     # Consul aclToken

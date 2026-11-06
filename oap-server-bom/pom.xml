@@ -34,18 +34,18 @@
         <graphql-java-tools.version>13.0.1</graphql-java-tools.version>
         <graphql-java.version>21.0</graphql-java.version>
         <graphql-java-extended-scalars.version>18.1</graphql-java-extended-scalars.version>
-        <okhttp.version>3.14.9</okhttp.version>
+        <okhttp.version>4.12.0</okhttp.version>
         <httpclient.version>4.5.13</httpclient.version>
         <h2.version>2.1.212</h2.version>
         <joda-time.version>2.10.5</joda-time.version>
-        <zookeeper.version>3.5.7</zookeeper.version>
+        <zookeeper.version>3.8.3</zookeeper.version>
         <guava.version>32.0.1-jre</guava.version>
         <snakeyaml.version>2.0</snakeyaml.version>
         <protobuf-java.version>3.21.8</protobuf-java.version>
         <protobuf-java-util.version>3.21.8</protobuf-java-util.version>
         <commons-codec.version>1.11</commons-codec.version>
-        <commons-lang3.version>3.12.0</commons-lang3.version>
-        <commons-io.version>2.7</commons-io.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <commons-io.version>2.14.0</commons-io.version>
         <commons-text.version>1.4</commons-text.version>
         <kubernetes.version>6.7.1</kubernetes.version>
         <hikaricp.version>3.1.0</hikaricp.version>
@@ -63,7 +63,7 @@
         <vavr.version>0.10.3</vavr.version>
         <groovy.version>4.0.15</groovy.version>
         <mvel.version>2.4.8.Final</mvel.version>
-        <commons-beanutils.version>1.9.4</commons-beanutils.version>
+        <commons-beanutils.version>1.11.0</commons-beanutils.version>
         <flatbuffers-java.version>1.12.0</flatbuffers-java.version>
         <postgresql.version>42.4.1</postgresql.version>
         <jetcd.version>0.5.3</jetcd.version>
@@ -111,6 +111,17 @@
                 <artifactId>log4j-over-slf4j</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
+            <!-- 安全版本管理：钉住传递引入的 logback，修复 CVE-2023-6378/6481、CVE-2024-12798/12801 -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>1.2.13</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>1.2.13</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-core</artifactId>
@@ -151,6 +162,17 @@
                 <artifactId>okhttp</artifactId>
                 <version>${okhttp.version}</version>
             </dependency>
+            <!-- 安全版本管理：钉住 okio，修复 CVE-2023-3635 -->
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>3.6.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>3.6.0</version>
+            </dependency>
             <dependency>
                 <groupId>com.h2database</groupId>
                 <artifactId>h2</artifactId>
@@ -173,6 +195,15 @@
                     <exclusion>
                         <artifactId>slf4j-log4j12</artifactId>
                         <groupId>org.slf4j</groupId>
+                    </exclusion>
+                    <!-- zk 3.8 传递引入 logback，会与 OAP 的 log4j2 SLF4J 绑定冲突导致日志丢失 -->
+                    <exclusion>
+                        <artifactId>logback-classic</artifactId>
+                        <groupId>ch.qos.logback</groupId>
+                    </exclusion>
+                    <exclusion>
+                        <artifactId>logback-core</artifactId>
+                        <groupId>ch.qos.logback</groupId>
                     </exclusion>
                 </exclusions>
             </dependency>
